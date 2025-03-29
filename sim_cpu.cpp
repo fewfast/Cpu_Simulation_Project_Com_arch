@@ -68,7 +68,7 @@ public:
             PC = target * 4;
         };
         instr_map["jr"] = [this](int rs, int dummy1, int dummy2) {
-            PC = registers[rs];  // ✅ กระโดดไปที่อยู่ที่เก็บใน rs
+            PC = registers[rs];  // กระโดดไปที่อยู่ที่เก็บใน rs
         };
         instr_map["and"] = [this](int rd, int rs, int rt) {
             registers[rd] = registers[rs] & registers[rt];
@@ -90,8 +90,6 @@ void CPU::execute(string instruction) {
     // แยกคำสั่งออกเป็นส่วนๆ&ลบ,
     iss >> op;  
    
-
-    
     if (op == "jr") {
         if (!(iss >> rs)) {
             throw runtime_error("Missing register in " + instruction);
@@ -123,11 +121,16 @@ void CPU::execute(string instruction) {
     //beq
     if (op == "beq" || op == "bne") {  
         string rs_str, rt_str, offset_str;
-        if (!(iss >> rs_str >> rt_str >> offset_str)) {
-            throw runtime_error("Invalid " + op + " format: " + op + " $rs, $rt, offset");
+
+        getline(iss >> ws, rs_str, ',');  // อ่านค่า rs_str และตัด ,
+        getline(iss >> ws, rt_str, ',');  // อ่านค่า rt_str และตัด ,
+        getline(iss >> ws, offset_str);   // อ่านค่า offset_str
+        
+        if (rs_str.empty() || rt_str.empty() || offset_str.empty()) {
+             throw runtime_error("Invalid " + op + " format: " + op + " $rs, $rt, offset");
         }
         if (reg_map.find(rs_str) == reg_map.end() || reg_map.find(rt_str) == reg_map.end()) {
-            throw runtime_error("Invalid register in " + op + ": " + rs_str + ", " + rt_str);
+            throw runtime_error("Invalid register in " + op + ": " + rs_str + rt_str);
         }
         int rs_index = reg_map[rs_str];
         int rt_index = reg_map[rt_str];
