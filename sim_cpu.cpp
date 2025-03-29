@@ -49,7 +49,36 @@ public:
         instr_map["li"] = [this](int rt,int imm,int dummy){
             registers[rt] = imm;
         };
-
+        instr_map["beq"] = [this](int rs, int rt, int offset) {
+            if (registers[rs] == registers[rt]) {
+                PC += offset * 4;  // คูณ 4 เพราะ MIPS ใช้ word-addressing
+            }
+        }; 
+        instr_map["bne"] = [this](int rs, int rt, int offset) {
+            if (registers[rs] != registers[rt]) {
+                PC += offset * 4;  // คูณ 4 เพราะ MIPS ใช้ word-addressing
+            }
+        };
+        instr_map["j"] = [this](int target, int dummy1, int dummy2) {
+            PC = target * 4;
+        };
+        
+        instr_map["jal"] = [this](int target, int dummy1, int dummy2) {
+            registers[31] = PC + 4;  // บันทึกที่อยู่ถัดไปลงใน $ra
+            PC = target * 4;
+        };
+        instr_map["jr"] = [this](int rs, int dummy1, int dummy2) {
+            PC = registers[rs];  // ✅ กระโดดไปที่อยู่ที่เก็บใน rs
+        };
+        instr_map["and"] = [this](int rd, int rs, int rt) {
+            registers[rd] = registers[rs] & registers[rt];
+        };
+        instr_map["or"] = [this](int rd, int rs, int rt) {
+            registers[rd] = registers[rs] | registers[rt];
+        };
+        instr_map["slt"] = [this](int rd, int rs, int rt) {
+            registers[rd] = (registers[rs] < registers[rt]) ? 1 : 0;
+        };
     }
 
     void execute(string instruction);
@@ -60,6 +89,57 @@ void CPU::execute(string instruction) {
     istringstream iss(instruction);
     // แยกคำสั่งออกเป็นส่วนๆ&ลบ,
     iss >> op;  
+   
+
+    
+    if (op == "jr") {
+        if (!(iss >> rs)) {
+            throw runtime_error("Missing register in " + instruction);
+        }
+        if (reg_map.find(rs) == reg_map.end()) {
+            throw runtime_error("Invalid register: " + rs);
+        }
+        int rs_index = reg_map[rs];
+        instr_map["jr"](rs_index, 0, 0);
+        return;
+    }
+    //j
+    if (op == "j" || op == "jal") {
+        string target_str;
+        if (!(iss >> target_str)) {
+            throw runtime_error("Invalid jump format: " + instruction);
+        }
+
+        int target;
+        try {
+            target = stoi(target_str);
+        } catch (...) {
+            throw runtime_error("Invalid jump target: " + target_str);
+        }
+
+        instr_map[op](target, 0, 0);
+        return;
+    }
+    //beq
+    if (op == "beq" || op == "bne") {  
+        string rs_str, rt_str, offset_str;
+        if (!(iss >> rs_str >> rt_str >> offset_str)) {
+            throw runtime_error("Invalid " + op + " format: " + op + " $rs, $rt, offset");
+        }
+        if (reg_map.find(rs_str) == reg_map.end() || reg_map.find(rt_str) == reg_map.end()) {
+            throw runtime_error("Invalid register in " + op + ": " + rs_str + ", " + rt_str);
+        }
+        int rs_index = reg_map[rs_str];
+        int rt_index = reg_map[rt_str];
+        int offset;
+        try {
+            offset = stoi(offset_str);
+        } catch (...) {
+            throw runtime_error("Invalid offset value: " + offset_str);
+        }
+        instr_map[op](rs_index, rt_index, offset);
+        return;
+    }
 
     if(op == "li"){
         string rt_str ,imm_str;
@@ -73,7 +153,7 @@ void CPU::execute(string instruction) {
         try{
             imm =stoi(imm_str);
         }catch(...){
-            throw runtime_error("Incalid immediate value:"+imm_str);
+            throw runtime_error("Invalid immediate value:"+imm_str);
         }
         instr_map["li"](rt_index,imm,0);
         return;
@@ -176,6 +256,11 @@ int main() {
     cout << "t3: " << cpu.registers[11] << endl; 
     cpu.execute("li $t3, 99");
     cout << "t3: " << cpu.registers[11] << endl;  // = 99
+
+   //test beq ให้หน่อย 
+    cout << "Before beq, PC: " << cpu.PC << endl;
+    cpu.execute("beq $t0, $t1, 2");  // ถ้าเท่ากัน PC ต้องเพิ่ม 8 (2*4)
+    cout << "After beq, PC: " << cpu.PC << endl;
     
     return 0;
 }
