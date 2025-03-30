@@ -10,7 +10,7 @@ public:
     int registers[32] = {0};   // 32 Registers
     int PC = 0;               // Program Counter
     int memory[1024] = {0};    // Simple Memory 4KB
-    unordered_map<string, function<void(int,int,int)>> instr_map;   // Map for Opcodes
+    unordered_map<string, function<void(int,int,int) >> instr_map;   // Map for Opcodes
     unordered_map<string, int> reg_map;  // Map for register -> index
 
     CPU() {
@@ -20,7 +20,7 @@ public:
 
     }
 
-
+    //  ค่า fix ไว้อยู่แล้ว
     void initRegisterMap() {
         reg_map["$zero"] = 0;
         reg_map["$t0"] = 8;
@@ -44,7 +44,10 @@ public:
             registers[rd] = registers[rs] * registers[rt];
         };
         instr_map["lw"] = [this](int rt,int offset,int rs){
-            registers[rt] =memory[registers[rs]+offset];
+            registers[rt] =memory[registers[rs]+offset / 4];
+        };
+        instr_map["sw"] = [this](int rt,int offset,int rs){
+            memory[(registers[rs] + offset) / 4] = registers[rt];
         };
         instr_map["li"] = [this](int rt,int imm,int dummy){
             registers[rt] = imm;
@@ -60,7 +63,7 @@ public:
             }
         };
         instr_map["j"] = [this](int target, int dummy1, int dummy2) {
-            PC = target * 4;
+            PC = target * 4;    // คูณ 4 เพราะ MIPS ใช้ word-addressing
         };
         
         instr_map["jal"] = [this](int target, int dummy1, int dummy2) {
@@ -68,7 +71,7 @@ public:
             PC = target * 4;
         };
         instr_map["jr"] = [this](int rs, int dummy1, int dummy2) {
-            PC = registers[rs];  // ✅ กระโดดไปที่อยู่ที่เก็บใน rs
+            PC = registers[rs] ;  // ✅ กระโดดไปที่อยู่ที่เก็บใน rs
         };
         instr_map["and"] = [this](int rd, int rs, int rt) {
             registers[rd] = registers[rs] & registers[rt];
@@ -82,16 +85,18 @@ public:
     }
 
     void execute(string instruction);
+    void printRegisters();
 };
-
+//function exucute
 void CPU::execute(string instruction) {
     string op, rd, rs, rt;
     istringstream iss(instruction);
-    // แยกคำสั่งออกเป็นส่วนๆ&ลบ,
+    
+    // อ่านคำสั่งตัวแรกก,
     iss >> op;  
    
 
-    
+    //คำสั่งประเภท jump (J, Jal , Jr)
     if (op == "jr") {
         if (!(iss >> rs)) {
             throw runtime_error("Missing register in " + instruction);
@@ -100,167 +105,104 @@ void CPU::execute(string instruction) {
             throw runtime_error("Invalid register: " + rs);
         }
         int rs_index = reg_map[rs];
-        instr_map["jr"](rs_index, 0, 0);
+        instr_map["jr"](reg_map[rs], 0, 0);
         return;
     }
-    //j
+    
     if (op == "j" || op == "jal") {
         string target_str;
         if (!(iss >> target_str)) {
             throw runtime_error("Invalid jump format: " + instruction);
         }
-
-        int target;
-        try {
-            target = stoi(target_str);
-        } catch (...) {
-            throw runtime_error("Invalid jump target: " + target_str);
-        }
-
+        //ถ้าไม่เกี่ยวค่อยลบ
+        int target = stoi(target_str);
         instr_map[op](target, 0, 0);
         return;
     }
-    //beq
+
+    //คำสั่งประเภท branch (BEQ, BNE)  
     if (op == "beq" || op == "bne") {  
         string rs_str, rt_str, offset_str;
         if (!(iss >> rs_str >> rt_str >> offset_str)) {
             throw runtime_error("Invalid " + op + " format: " + op + " $rs, $rt, offset");
-        }
+        }//ถ้า check ข้างบนแล้วค่ามันผิดลบ + op + " $rs, $rt, offset"
         if (reg_map.find(rs_str) == reg_map.end() || reg_map.find(rt_str) == reg_map.end()) {
             throw runtime_error("Invalid register in " + op + ": " + rs_str + ", " + rt_str);
-        }
+        }//ถ้า check ข้างบนแล้วค่ามันผิดลบ  ": " + rs_str + ", " + rt_str
         int rs_index = reg_map[rs_str];
         int rt_index = reg_map[rt_str];
-        int offset;
-        try {
-            offset = stoi(offset_str);
-        } catch (...) {
-            throw runtime_error("Invalid offset value: " + offset_str);
-        }
+        int offset = stoi(offset_str);
         instr_map[op](rs_index, rt_index, offset);
         return;
     }
 
+    //คำสั่ง Load Immediate (LI)
     if(op == "li"){
         string rt_str ,imm_str;
-        getline(iss >> ws,rt_str,',');
-        getline(iss >> ws,imm_str);
-        if(reg_map.find(rt_str)== reg_map.end()){
-            throw runtime_error("Invalid destination: "+rt_str);
+        
+        if(!(iss >> rt_str >> imm_str)){
+            throw runtime_error("Invalid LI");
         }
-        int rt_index =reg_map[rt_str];
-        int imm;
-        try{
-            imm =stoi(imm_str);
-        }catch(...){
-            throw runtime_error("Invalid immediate value:"+imm_str);
+        if(reg_map.find(rt_str) == reg_map.end()){
+            throw runtime_error("Runtime:" +rt_str);
         }
-        instr_map["li"](rt_index,imm,0);
+        int rt_index = reg_map[rt_str];
+        int imm = stoi(imm_str);
+        
+        instr_map["li"](rt_index,imm,0); 
         return;
     }
 
-    if(op == "lw " || op == "sw"){
-        string rd_str,offset_rs;
-        if (!(iss >> rd_str)){
-            throw runtime_error("Missing destination register in " + instruction);
-        }
-        getline(iss >> ws,offset_rs);
-        size_t open_paren = offset_rs.find('(');
-        size_t close_paren = offset_rs.find(')');
-        if (open_paren == string::npos || close_paren == string::npos){
-            throw runtime_error("Invalid format for " + op + " instruction. Expected: "+op+"$rd,offset($rs)");
-        }
-        string offset_str = offset_rs.substr(0,open_paren);
-        string rs_str = offset_rs.substr(open_paren + 1,close_paren - open_paren -1);
-        if (reg_map.find(rd_str) == reg_map.end()){
-            throw runtime_error("Invalid destination reguster: "+ rd_str);
-        }
-        if (reg_map.find(rs_str) == reg_map.end()){
-            throw runtime_error("Incalid source register: "+rs_str);            
-        }
-        int offset;
-        try{
-            offset = stoi(offset_str);
-        }catch(...){
-            throw runtime_error("Incalid offset valie: " + offset_str);
-        }
-        int rd_index = reg_map[rd_str];
-        int rs_index =reg_map[rs_str];
-
-        if(op == "lw"){
-            registers[rd_index] = memory[offset + registers[rs_index]];
-        }
-
-        if (op == "sw"){
-            memory[offset + registers[rs_index]] = registers[rd_index];
-        }else{
-            cout << "error lw&sw";
-        }
-
+    //คำสั่ง Load/Store (LW , Sw)
+    if (op == "lw" || op == "sw") {
+        string rt_str, offset_rs;
+        if (!(iss >> rt_str)) throw runtime_error("Missing destination register in " + instruction);
+        getline(iss >> ws, offset_rs);
+        size_t open_paren = offset_rs.find('('), close_paren = offset_rs.find(')');
+        if (open_paren == string::npos || close_paren == string::npos)
+            throw runtime_error("Invalid format for " + op);
+        string offset_str = offset_rs.substr(0, open_paren);
+        string rs_str = offset_rs.substr(open_paren + 1, close_paren - open_paren - 1);
+        if (reg_map.find(rt_str) == reg_map.end() || reg_map.find(rs_str) == reg_map.end())
+            throw runtime_error("Invalid register");
+        instr_map[op](reg_map[rt_str], stoi(offset_str), reg_map[rs_str]);
         return;
-    }else{
+    }
 
-        if (!getline(iss >> ws, rd, ',')) {
-            throw runtime_error("Missing first operand in " + instruction);
-        }
-        if (!getline(iss >> ws, rs, ',')) {
-            throw runtime_error("Missing second operand in " + instruction);
-        }
-        if (!getline(iss >> ws, rt)) {
-            throw runtime_error("Missing third operand in " + instruction);
-        }
-
-        if (reg_map.find(rd) == reg_map.end()) {
-            throw runtime_error("Invalid destination register: " + rd);
-        }
-        if (reg_map.find(rs) == reg_map.end()) {
-            throw runtime_error("Invalid first source register: " + rs);
-        }
-        if (reg_map.find(rt) == reg_map.end()) {
-            throw runtime_error("Invalid second source register: " + rt);
-        }
-            
-        int rd_index = reg_map[rd];
-        int rs_index = reg_map[rs];
-        int rt_index = reg_map[rt];
-
-        if (instr_map.find(op) == instr_map.end()) {
-            throw runtime_error("Instruction not supported: " + op);
-        }
+    if (!(iss >> rd >> rs >> rt)) throw runtime_error("Invalid format for " + op);
+    if (reg_map.find(rd) == reg_map.end() || reg_map.find(rs) == reg_map.end() || reg_map.find(rt) == reg_map.end())
+        throw runtime_error("Invalid register in " + op);
             
         // เรียกใช้งาน lambda function ตามคำสั่ง
-        instr_map[op](rd_index, rs_index, rt_index);
+        instr_map[op](reg_map[rd], reg_map[rs], reg_map[rt]);
+    }
+
+
+void CPU::printRegisters() {
+    cout << "Register values:\n";
+    for (const auto &r : reg_map) {
+        cout << r.first << " = " << registers[r.second] << "\n";
     }
 }
 
 int main() {
     CPU cpu;
+    string command;
 
-    // กำหนดค่าเริ่มต้นให้กับบาง register
-    cpu.registers[9] = 5;  // $t1 = 5
-    cpu.registers[10] = 3; // $t2 = 3
-    cpu.registers[18] = 10; // $s2 = 10
-    cpu.registers[19] = 7;  // $s3 = 7
+    cout << "Enter assembly instuction (type 'exit' to quit):\n";
+  
+    while (true) {
+        cout << "> ";
+        getline(cin, command);
+        if (command == "exit") break;
+        try {
+            cpu.execute(command);
+            cpu.printRegisters();
+        } catch (const exception &e) {
+            cerr << "Error: " << e.what() << endl;
+        }
+    }
 
-
-
-    cpu.execute("add $t0, $t1, $t2");  // $t0 = $t1 + $t2 = 5 + 3 = 8
-    cpu.execute("sub $s1, $s2, $s3");  // $s1 = $s2 - $s3 = 10 - 7 = 3
-
-
-
-    cout << "t0: " << cpu.registers[8] << endl;  // = 8
-    cout << "s1: " << cpu.registers[17] << endl; // = 3
-
-
-    cout << "t3: " << cpu.registers[11] << endl; 
-    cpu.execute("li $t3, 99");
-    cout << "t3: " << cpu.registers[11] << endl;  // = 99
-
-   //test beq ให้หน่อย 
-    cout << "Before beq, PC: " << cpu.PC << endl;
-    cpu.execute("beq $t0, $t1, 2");  // ถ้าเท่ากัน PC ต้องเพิ่ม 8 (2*4)
-    cout << "After beq, PC: " << cpu.PC << endl;
     
     return 0;
 }
