@@ -241,7 +241,7 @@ int main() {
 
     // กำหนดค่าเริ่มต้นให้กับบาง register
     cpu.registers[9] = 5;  // $t1 = 5
-    cpu.registers[10] = 3; // $t2 = 3
+    cpu.registers[10] = 5; // $t2 = 3
     cpu.registers[18] = 10; // $s2 = 10
     cpu.registers[19] = 7;  // $s3 = 7
 
@@ -264,6 +264,9 @@ int main() {
     cout << "Before beq, PC: " << cpu.PC << endl;
     cpu.execute("beq $t0, $t1, 2");  // ถ้าเท่ากัน PC ต้องเพิ่ม 8 (2*4)
     cout << "After beq, PC: " << cpu.PC << endl;
+
+    //test bne
+    cpu.execute("bne $t0,$t1,2");
     
     return 0;
 }
