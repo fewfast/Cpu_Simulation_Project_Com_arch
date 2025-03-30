@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <sstream>
 #include <functional>
+#include <algorithm>
 
 using namespace std;
 
@@ -203,7 +204,20 @@ void CPU::execute(string instruction) {
 
 void CPU::printRegisters() {
     cout << "Register values:\n";
+
+    vector<pair<string, int>> sorted_registers;
     for (const auto &r : reg_map) {
+        sorted_registers.push_back({r.first, r.second});
+    }
+
+    // เรียงลำดับตามค่าของรีจิสเตอร์ (index)
+    sort(sorted_registers.begin(), sorted_registers.end(), 
+         [](const pair<string, int> &a, const pair<string, int> &b) {
+             return a.second < b.second;
+         });
+
+    // แสดงผลตามลำดับที่ถูกต้อง
+    for (const auto &r : sorted_registers) {
         cout << r.first << " = " << registers[r.second] << "\n";
     }
 }
