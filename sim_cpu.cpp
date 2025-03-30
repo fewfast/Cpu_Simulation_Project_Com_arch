@@ -2,12 +2,14 @@
 #include <unordered_map>
 #include <sstream>
 #include <functional>
+#include <algorithm>
 
 using namespace std;
 
 class CPU // class cpu;
 {
 public:
+
     int registers[32] = {0};                                        //  สร้าง 32 Registers และตั้งให้ทุกช่องใน Array มีค่าเป็น 0
     int PC = 0;                                                     //  Program Counter บอกตำแหน่งปัจจุบันของ Command ที่ Process อยู่
     int memory[1024] = {0};                                         //  สร้าง Ram ขนาด 4KB โดยที่ 1 ช่อง array = 4 byte , 4*1024 = 4096B , = 4KB
@@ -19,12 +21,14 @@ public:
                                                                     */
     unordered_map<string, int> reg_map;                             // สร้าง map ที่ไม่เรียงตามอักษร ไว้เก็บค่า value แต่ละ register
 
+
     CPU()
     {
         registers[0] = 0;     // Register 0 มีค่าเป็น 0 เท่านั้น(ห้ามเปลี่ยน)
         initInstructionMap(); // ประกาศ function ทิ้งไว้
         initRegisterMap();    // ประกาศ function ทิ้งไว้
     }
+
 
     //  ค่า fix ไว้อยู่แล้ว(initRegisterMap ห้ามแก้!)
     void initRegisterMap() // ทำให้ function initRegisterMap() กำหนดข้อมูลใน map register
@@ -42,10 +46,12 @@ public:
         reg_map["$a2"] = 6;
         reg_map["$a3"] = 7;
         // $Temporary registers ชั่วคราว ที่ใช้ในการเก็บข้อมูลระหว่างการคำนวณหรือลำดับการดำเนินงานต่าง ๆ
+
         reg_map["$t0"] = 8;
         reg_map["$t1"] = 9;
         reg_map["$t2"] = 10;
         reg_map["$t3"] = 11;
+
         reg_map["$t4"] = 12;
         reg_map["$t5"] = 13;
         reg_map["$t6"] = 14;
@@ -125,7 +131,7 @@ public:
         {
             registers[rt] = imm;
         };
-
+      
         /*  Branch if Equal กระโดดไปยังตำแหน่งอื่นของโปรแกรม หากค่าของรีจิสเตอร์สองตัวเท่ากัน
             beq $rs, $rt, offset [if register[rs] == register[rt] กระโดดไปที่ PC + (offset*4)]
             PC ใช้เป็น Byte Address offset เลย *4
@@ -196,6 +202,8 @@ public:
         };
     }
 
+
+
     void execute(string instruction); // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง ทำงานโดยใช้ string
     void printRegisters();            // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง เป็น function void
 };
@@ -224,6 +232,7 @@ void CPU::execute(string instruction)
         }
         int rs_index = reg_map[rs];
         instr_map["jr"](reg_map[rs], 0, 0);
+
         return;
     }
 
@@ -301,14 +310,27 @@ void CPU::execute(string instruction)
         throw runtime_error("Invalid format for " + op);
     if (reg_map.find(rd) == reg_map.end() || reg_map.find(rs) == reg_map.end() || reg_map.find(rt) == reg_map.end())
         throw runtime_error("Invalid register in " + op);
-
     // เรียกใช้งาน lambda function ตามคำสั่ง
     instr_map[op](reg_map[rd], reg_map[rs], reg_map[rt]);
 }
 
 void CPU::printRegisters() // print ค่าในทุก register
 {
+    void CPU::printRegisters() {
     cout << "Register values:\n";
+
+    vector<pair<string, int>> sorted_registers;//สร้างตัวแปร Vector ที่เป็นชนิดคู่(pair) ซึ่งเอา string มาคู่กับ int 
+    for (const auto &r : reg_map) {//เอาค่าใน reg_map ใส่ลง vector
+        sorted_registers.push_back({r.first, r.second});
+    }
+
+    // sortค่าตาม registermap int จากน้อยไปมาก
+    sort(sorted_registers.begin(), sorted_registers.end(), 
+         [](const pair<string, int> &a, const pair<string, int> &b) {//รับ parameter pair<string, int> มาใส่เป็น address ของ a และ b
+             return a.second < b.second; //ทำให้เรียงลำดับจากน้อยไปมาก
+         });
+
+    // แสดงผลตามลำดับที่ถูกต้อง
     for (const auto &r : reg_map)
     {
         cout << r.first << " = " << registers[r.second] << "\n";
@@ -344,7 +366,6 @@ int main() // start
         cout << "li\n";
         cout << "Enter assembly instuction (type 'exit' to quit):\n";
         cout << "> ";
-
         // read string
         getline(cin, command);
         if (command == "exit") // if input string(command)=exit break while
@@ -364,6 +385,5 @@ int main() // start
             }
         }
     }
-
     return 0;
 }
