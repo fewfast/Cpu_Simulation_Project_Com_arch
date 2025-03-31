@@ -3,33 +3,31 @@
 #include <sstream>
 #include <functional>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 
-class CPU // class cpu;
-{
+class CPU {
 public:
-
-    int registers[32] = {0};                                        //  สร้าง 32 Registers และตั้งให้ทุกช่องใน Array มีค่าเป็น 0
-    int PC = 0;                                                     //  Program Counter บอกตำแหน่งปัจจุบันของ Command ที่ Process อยู่
-    int memory[1024] = {0};                                         //  สร้าง Ram ขนาด 4KB โดยที่ 1 ช่อง array = 4 byte , 4*1024 = 4096B , = 4KB
-    unordered_map<string, function<void(int, int, int)>> instr_map; /*  สร้างตัวแปรชื่อ instr_map มาเก็บ command list
+    int registers[32] = {0};   //  สร้าง 32 Registers และตั้งให้ทุกช่องใน Array มีค่าเป็น 0
+    int PC = 0;               //  Program Counter บอกตำแหน่งปัจจุบันของ Command ที่ Process อยู่
+    int memory[1024] = {0};    //  สร้าง Ram ขนาด 4KB โดยที่ 1 ช่อง array = 4 byte , 4*1024 = 4096B , = 4KB
+    unordered_map<string, function<void(int,int,int) >> instr_map;   /*  สร้างตัวแปรชื่อ instr_map มาเก็บ command list
                                                                         unordered_map = การสร้าง map ที่ไม่ได้เรียงตามตัวอักษรถ้าเรียงตามตัวอักษรอัตโนมัติจะใช้ map
                                                                         unordered_map<string, function<void(int, int, int)>> เป็น hash map
                                                                         hash map = โครงสร้างข้อมูลที่มีรูปแบบเป็น คู่ key กับ value เช่น map["Alice"] = 30;
                                                                         function<void(int, int, int)> = เก็บ ฟังก์ชันที่ไม่คืนค่า (void) และรับ พารามิเตอร์ 3 ตัว ซึ่งแต่ละตัวมีประเภทเป็น int
                                                                     */
-    unordered_map<string, int> reg_map;                             // สร้าง map ที่ไม่เรียงตามอักษร ไว้เก็บค่า value แต่ละ register
+    unordered_map<string, int> reg_map;  // สร้าง map ที่ไม่เรียงตามอักษร ไว้เก็บค่า value แต่ละ register
 
-
-    CPU()
-    {
-        registers[0] = 0;     // Register 0 มีค่าเป็น 0 เท่านั้น(ห้ามเปลี่ยน)
+    CPU() {
+        registers[0] = 0; // Register 0 always 0
         initInstructionMap(); // ประกาศ function ทิ้งไว้
-        initRegisterMap();    // ประกาศ function ทิ้งไว้
+        initRegisterMap(); // ประกาศ function ทิ้งไว้
+
     }
 
-
+    //  ค่า fix ไว้อยู่แล้ว
     //  ค่า fix ไว้อยู่แล้ว(initRegisterMap ห้ามแก้!)
     void initRegisterMap() // ทำให้ function initRegisterMap() กำหนดข้อมูลใน map register
     {
@@ -110,7 +108,7 @@ public:
         */
         instr_map["lw"] = [this](int rt, int offset, int rs)
         {
-            registers[rt] = memory[registers[rs] + offset / 4];
+            registers[rt] = memory[(registers[rs] + offset) / 4];
         };
 
         /*  Store Word ใช้ในการเก็บค่าจาก register ลง Memory
@@ -201,66 +199,52 @@ public:
             registers[rd] = (registers[rs] < registers[rt]) ? 1 : 0;
         };
     }
-
-
-
     void execute(string instruction); // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง ทำงานโดยใช้ string
     void printRegisters();            // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง เป็น function void
 };
 
-//-----------------------------------------------NOTE : แปลให้ทุกอย่างยกเว้นส่วน executeเพราะงั้น comment ใน CPU::execute ทุกอันจะเป็นของ ChatGPT -----------------------------------------------
-
-// function exucute
-void CPU::execute(string instruction)
-{
+//function exucute
+void CPU::execute(string instruction) {
     string op, rd, rs, rt;
     istringstream iss(instruction);
-
+    
     // อ่านคำสั่งตัวแรกก,
-    iss >> op;
+    iss >> op;  
+   
 
-    // คำสั่งประเภท jump (J, Jal , Jr)
-    if (op == "jr")
-    {
-        if (!(iss >> rs))
-        {
+    //คำสั่งประเภท jump (J, Jal , Jr)
+    if (op == "jr") {
+        if (!(iss >> rs)) {
             throw runtime_error("Missing register in " + instruction);
         }
-        if (reg_map.find(rs) == reg_map.end())
-        {
+        if (reg_map.find(rs) == reg_map.end()) {
             throw runtime_error("Invalid register: " + rs);
         }
         int rs_index = reg_map[rs];
         instr_map["jr"](reg_map[rs], 0, 0);
-
         return;
     }
-
-    if (op == "j" || op == "jal")
-    {
+    
+    if (op == "j" || op == "jal") {
         string target_str;
-        if (!(iss >> target_str))
-        {
+        if (!(iss >> target_str)) {
             throw runtime_error("Invalid jump format: " + instruction);
         }
-        // ถ้าไม่เกี่ยวค่อยลบ
+        //ถ้าไม่เกี่ยวค่อยลบ
         int target = stoi(target_str);
         instr_map[op](target, 0, 0);
         return;
     }
 
-    // คำสั่งประเภท branch (BEQ, BNE)
-    if (op == "beq" || op == "bne")
-    {
+    //คำสั่งประเภท branch (BEQ, BNE)  
+    if (op == "beq" || op == "bne") {  
         string rs_str, rt_str, offset_str;
-        if (!(iss >> rs_str >> rt_str >> offset_str))
-        {
+        if (!(iss >> rs_str >> rt_str >> offset_str)) {
             throw runtime_error("Invalid " + op + " format: " + op + " $rs, $rt, offset");
-        } // ถ้า check ข้างบนแล้วค่ามันผิดลบ + op + " $rs, $rt, offset"
-        if (reg_map.find(rs_str) == reg_map.end() || reg_map.find(rt_str) == reg_map.end())
-        {
+        }//ถ้า check ข้างบนแล้วค่ามันผิดลบ + op + " $rs, $rt, offset"
+        if (reg_map.find(rs_str) == reg_map.end() || reg_map.find(rt_str) == reg_map.end()) {
             throw runtime_error("Invalid register in " + op + ": " + rs_str + ", " + rt_str);
-        } // ถ้า check ข้างบนแล้วค่ามันผิดลบ  ": " + rs_str + ", " + rt_str
+        }//ถ้า check ข้างบนแล้วค่ามันผิดลบ  ": " + rs_str + ", " + rt_str
         int rs_index = reg_map[rs_str];
         int rt_index = reg_map[rt_str];
         int offset = stoi(offset_str);
@@ -268,32 +252,27 @@ void CPU::execute(string instruction)
         return;
     }
 
-    // คำสั่ง Load Immediate (LI)
-    if (op == "li")
-    {
-        string rt_str, imm_str;
-        if (!(iss >> rt_str >> imm_str))
-        {
-            cout << op + rt_str + imm_str;
+    //คำสั่ง Load Immediate (LI)
+    if(op == "li"){
+        string rt_str ,imm_str;
+        if(!(iss >> rt_str >> imm_str)){
+            cout << op + rt_str + imm_str ;
             throw runtime_error("Invalid LI");
         }
-        if (reg_map.find(rt_str) == reg_map.end())
-        {
-            throw runtime_error("Runtime:" + rt_str);
+        if(reg_map.find(rt_str) == reg_map.end()){
+            throw runtime_error("Runtime:" +rt_str);
         }
         int rt_index = reg_map[rt_str];
         int imm = stoi(imm_str);
-
-        instr_map["li"](rt_index, imm, 0);
+        
+        instr_map["li"](rt_index,imm,0); 
         return;
     }
 
-    // คำสั่ง Load/Store (LW , Sw)
-    if (op == "lw" || op == "sw")
-    {
+    //คำสั่ง Load/Store (LW , Sw)
+    if (op == "lw" || op == "sw") {
         string rt_str, offset_rs;
-        if (!(iss >> rt_str))
-            throw runtime_error("Missing destination register in " + instruction);
+        if (!(iss >> rt_str)) throw runtime_error("Missing destination register in " + instruction);
         getline(iss >> ws, offset_rs);
         size_t open_paren = offset_rs.find('('), close_paren = offset_rs.find(')');
         if (open_paren == string::npos || close_paren == string::npos)
@@ -306,40 +285,31 @@ void CPU::execute(string instruction)
         return;
     }
 
-    if (!(iss >> rd >> rs >> rt))
-        throw runtime_error("Invalid format for " + op);
+    if (!(iss >> rd >> rs >> rt)) throw runtime_error("Invalid format for " + op);
     if (reg_map.find(rd) == reg_map.end() || reg_map.find(rs) == reg_map.end() || reg_map.find(rt) == reg_map.end())
         throw runtime_error("Invalid register in " + op);
-    // เรียกใช้งาน lambda function ตามคำสั่ง
-    instr_map[op](reg_map[rd], reg_map[rs], reg_map[rt]);
-}
+            
+        // เรียกใช้งาน lambda function ตามคำสั่ง
+        instr_map[op](reg_map[rd], reg_map[rs], reg_map[rt]);
+    }
 
-void CPU::printRegisters() // print ค่าในทุก register
-{
-    void CPU::printRegisters() {
+
+void CPU::printRegisters() {
     cout << "Register values:\n";
-
-    vector<pair<string, int>> sorted_registers;//สร้างตัวแปร Vector ที่เป็นชนิดคู่(pair) ซึ่งเอา string มาคู่กับ int 
-    for (const auto &r : reg_map) {//เอาค่าใน reg_map ใส่ลง vector
-        sorted_registers.push_back({r.first, r.second});
+    
+    vector<pair<int, string>> sorted_registers;// เก็บค่าตาม index
+    for (const auto &r : reg_map) {
+        sorted_registers.push_back({r.second, r.first});
     }
 
-    // sortค่าตาม registermap int จากน้อยไปมาก
-    sort(sorted_registers.begin(), sorted_registers.end(), 
-         [](const pair<string, int> &a, const pair<string, int> &b) {//รับ parameter pair<string, int> มาใส่เป็น address ของ a และ b
-             return a.second < b.second; //ทำให้เรียงลำดับจากน้อยไปมาก
-         });
+    // เรียงลำดับตามค่า index ของ reg_map (int) จาก$zero ไป $ra
+    sort(sorted_registers.begin(), sorted_registers.end());
 
-    // แสดงผลตามลำดับที่ถูกต้อง
-    for (const auto &r : reg_map)
-    {
-        cout << r.first << " = " << registers[r.second] << "\n";
+    // แสดงผลตามลำดับ index ที่ถูกต้อง
+    for (const auto &r : sorted_registers) {
+        cout << r.second << " = " << registers[r.first] << "\n";
     }
-    /*for loop
-    r.first คือ ค่าของ reg_map key(string)
-    r.second คือ ค่า ของ reg_map value(int)
-    registers[r.second] คือ เอาค่าเลขของ r.second มาค้นใน array ตำแหน่ง registers
-    */
+    cout << "PC = " << PC << endl;
 }
 
 int main() // start
@@ -350,20 +320,8 @@ int main() // start
     while (true)
     {
         // program guide
-        cout << "Instruction List\n";
-        cout << "add\n";
-        cout << "sub\n";
-        cout << "lw\n";
-        cout << "sw\n";
-        cout << "beq\n";
-        cout << "bne\n";
-        cout << "j\n";
-        cout << "jal\n";
-        cout << "jr\n";
-        cout << "and\n";
-        cout << "or\n";
-        cout << "slt\n";
-        cout << "li\n";
+        cout << "-----Instruction List-----\n";
+        cout << "add, sub, lw, sw, beq, bne, j, jal, jr, and, or, slt, li\n";
         cout << "Enter assembly instuction (type 'exit' to quit):\n";
         cout << "> ";
         // read string
