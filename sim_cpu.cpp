@@ -316,7 +316,6 @@ void CPU::execute(string instruction)
 
 void CPU::printRegisters() // print ค่าในทุก register
 {
-    void CPU::printRegisters() {
     cout << "Register values:\n";
 
     vector<pair<string, int>> sorted_registers;//สร้างตัวแปร Vector ที่เป็นชนิดคู่(pair) ซึ่งเอา string มาคู่กับ int 
@@ -340,6 +339,7 @@ void CPU::printRegisters() // print ค่าในทุก register
     r.second คือ ค่า ของ reg_map value(int)
     registers[r.second] คือ เอาค่าเลขของ r.second มาค้นใน array ตำแหน่ง registers
     */
+    
 }
 
 int main() // start
