@@ -20,7 +20,7 @@ public:
                                                                         function<void(int, int, int)> = เก็บ ฟังก์ชันที่ไม่คืนค่า (void) และรับ พารามิเตอร์ 3 ตัว ซึ่งแต่ละตัวมีประเภทเป็น int
                                                                     */
     unordered_map<string, int> reg_map;                             // สร้าง map ที่ไม่เรียงตามอักษร ไว้เก็บค่า value แต่ละ register
-
+    vector<string> program;
 
     CPU()
     {
@@ -88,18 +88,21 @@ public:
         instr_map["add"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = registers[rs] + registers[rt];
+            PC++;
         };
 
         // ลบ sub $t0, $t1, $t2 [$t0 = $t1 - $t2]
         instr_map["sub"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = registers[rs] - registers[rt];
+            PC++;
         };
 
         // คูณ mul $t0, $t1, $t2 [$t0 = $t1 * $t2]
         instr_map["mul"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = registers[rs] * registers[rt];
+            PC++;
         };
 
         /*  Load Word โหลดข้อมูลจาก Memory registers
@@ -111,6 +114,7 @@ public:
         instr_map["lw"] = [this](int rt, int offset, int rs)
         {
             registers[rt] = memory[registers[rs] + offset / 4];
+            PC++;
         };
 
         /*  Store Word ใช้ในการเก็บค่าจาก register ลง Memory
@@ -122,6 +126,7 @@ public:
         instr_map["sw"] = [this](int rt, int offset, int rs)
         {
             memory[(registers[rs] + offset) / 4] = registers[rt];
+            PC++;
         };
 
         /*  Load Immediate ใส่ค่าคงที่ลงใน register
@@ -130,6 +135,7 @@ public:
         instr_map["li"] = [this](int rt, int imm, int dummy)
         {
             registers[rt] = imm;
+            PC++;
         };
       
         /*  Branch if Equal กระโดดไปยังตำแหน่งอื่นของโปรแกรม หากค่าของรีจิสเตอร์สองตัวเท่ากัน
@@ -140,10 +146,11 @@ public:
         {
             if (registers[rs] == registers[rt])
             {
-                PC += offset * 4;
+                PC = PC + 1 + offset * 4;
+            }else{
+                PC++;
             }
         };
-
         /*  Branch if Not Equal กระโดดไปยังตำแหน่งอื่นของโปรแกรม หากค่าของรีจิสเตอร์สองตัวไม่เท่ากัน
             bne $rs, $rt, offset [if register[rs] != register[rt] กระโดดไปที่ PC + (offset*4)]
             PC ใช้เป็น Byte Address offset เลย *4
@@ -152,21 +159,24 @@ public:
         {
             if (registers[rs] != registers[rt])
             {
-                PC += offset * 4;
+                PC = PC + 1 + offset * 4;
+            }else{
+                PC++;
             }
+            
         };
 
         //  j target | Jump กระโดดไปยัง target ,PC ใช้ Byte address , target เป็น word address เลยต้อง *4
         instr_map["j"] = [this](int target, int dummy1, int dummy2)
         {
-            PC = target * 4;
+            PC = target;
         };
 
         //  jal target |Jump and Link กระโดดไปยัง target จากนั้น บันทึกค่าที่อยู่ถัดไป(PC + 4) ลง $ra,PC ใช้ Byte address , target เป็น word address เลยต้อง *4
         instr_map["jal"] = [this](int target, int dummy1, int dummy2)
         {
-            registers[31] = PC + 4;
-            PC = target * 4;
+            registers[31] = PC + 1;
+            PC = target;
         };
 
         //  jr register |Jump Register กระโดดไปยังที่อยู่ในรีจิสเตอร์ที่ระบุ
@@ -182,6 +192,7 @@ public:
         instr_map["and"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = registers[rs] & registers[rt];
+            PC++;
         };
 
         /*  Or นำค่า 2 ค่าใน register มา or กันและเก็บผลลัพธ์ในรีจิสเตอร์ เป็นการตรวจสอบค่าบิตแต่ละบิตในสองตัวเลข ถ้าบิตอันใดอันหนึ่งเป็น 1 ผลลัพธ์จะเป็น 1 แต่ถ้าไม่ใช่ ผลลัพธ์จะเป็น 0
@@ -191,6 +202,7 @@ public:
         instr_map["or"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = registers[rs] | registers[rt];
+            PC++;
         };
 
         /*  Set on Less Than กำหนดค่าเป็น 1 ถ้าค่าแรกน้อยกว่าค่า 2
@@ -199,6 +211,7 @@ public:
         instr_map["slt"] = [this](int rd, int rs, int rt)
         {
             registers[rd] = (registers[rs] < registers[rt]) ? 1 : 0;
+            PC++;
         };
     }
 
@@ -206,6 +219,8 @@ public:
 
     void execute(string instruction); // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง ทำงานโดยใช้ string
     void printRegisters();            // สร้าง function เปล่าๆ มาเขียนแยกทีหลัง เป็น function void
+    void run();
+    void loadProgram(const vector<string> &prog);
 };
 
 //-----------------------------------------------NOTE : แปลให้ทุกอย่างยกเว้นส่วน executeเพราะงั้น comment ใน CPU::execute ทุกอันจะเป็นของ ChatGPT -----------------------------------------------
@@ -230,7 +245,7 @@ void CPU::execute(string instruction)
         {
             throw runtime_error("Invalid register: " + rs);
         }
-        int rs_index = reg_map[rs];
+        ///int rs_index = reg_map[rs]; ยังไม่รู้มีไว้ทำไม
         instr_map["jr"](reg_map[rs], 0, 0);
 
         return;
@@ -305,7 +320,7 @@ void CPU::execute(string instruction)
         instr_map[op](reg_map[rt_str], stoi(offset_str), reg_map[rs_str]);
         return;
     }
-
+    // กรณีคำสั่งประเภทที่มี 3 operands: add, sub, mul, and, or, slt เป็นต้น
     if (!(iss >> rd >> rs >> rt))
         throw runtime_error("Invalid format for " + op);
     if (reg_map.find(rd) == reg_map.end() || reg_map.find(rs) == reg_map.end() || reg_map.find(rt) == reg_map.end())
@@ -330,16 +345,27 @@ void CPU::printRegisters() // print ค่าในทุก register
          });
 
     // แสดงผลตามลำดับที่ถูกต้อง
-    for (const auto &r : reg_map)
+    for (const auto &r : sorted_registers)
     {
         cout << r.first << " = " << registers[r.second] << "\n";
     }
-    /*for loop
-    r.first คือ ค่าของ reg_map key(string)
-    r.second คือ ค่า ของ reg_map value(int)
-    registers[r.second] คือ เอาค่าเลขของ r.second มาค้นใน array ตำแหน่ง registers
-    */
+
     
+}
+
+void CPU::run(){
+    while (PC < program.size()) {
+        string instr = program[PC];
+        cout << "Executing: " << instr << "\n";
+        execute(instr);
+        printRegisters();
+        cout << "PC = " << PC << "\n";
+        cout << "--------------------------\n";
+    }
+}
+void CPU::loadProgram(const vector<string> &prog){
+    program = prog;
+
 }
 
 int main() // start
